@@ -1,0 +1,18 @@
+{
+  "name": "comdal-backend",
+  "version": "1.1.0",
+  "description": "Comdal - company research backend (Express + Tavily)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@tavily/core": "^1.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0"
+  }
+}

@@ -1,0 +1,14 @@
+# Render Blueprint - backend deploy (optional, you can also set this up from the dashboard)
+services:
+  - type: web
+    name: comdal-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: TAVILY_API_KEY
+        sync: false            # paste the real key in the Render dashboard
+      - key: ALLOWED_ORIGIN
+        sync: false            # your frontend URL, e.g. https://comdal.vercel.app

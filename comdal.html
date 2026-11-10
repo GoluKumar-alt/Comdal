@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Comdal - Company Research</title>
+
+    <!-- Apply saved theme before CSS paints (prevents a light-mode flash) -->
+    <script>
+        try {
+            var savedTheme = localStorage.getItem("comdalTheme");
+            if (!savedTheme) {
+                savedTheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+            }
+            document.documentElement.setAttribute("data-theme", savedTheme);
+        } catch (e) {}
+    </script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-text">
+            <h1>Comdal</h1>
+            <p>Company Research & Report Generator</p>
+        </div>
+
+        <!-- DARK / LIGHT MODE TOGGLE -->
+        <button
+            type="button"
+            id="themeToggle"
+            class="theme-toggle"
+            aria-label="Switch to dark mode"
+            title="Switch theme">
+            <span id="themeToggleIcon" aria-hidden="true">🌙</span>
+            <span id="themeToggleText">Dark</span>
+        </button>
+    </header>
+
+    <!-- MAIN PAGE -->
+    <main class="page">
+
+        <h1 class="welcome">Welcome to Comdal!</h1>
+
+        <!-- RECENT SEARCHES (saved in this browser) -->
+        <section id="historyPanel" class="history-panel" aria-label="Recent searches" hidden>
+
+            <div class="history-header">
+                <h2>Recent Searches</h2>
+                <button type="button" id="clearHistoryBtn" class="link-btn">Clear history</button>
+            </div>
+
+            <div id="historyList" class="history-list"></div>
+
+        </section>
+
+        <div class="form-container">
+
+            <h2 class="fill">Fill Company Information</h2>
+
+            <!-- STATUS / ERROR BANNER -->
+            <div id="statusBanner" class="banner" role="alert" aria-live="assertive" hidden>
+                <span id="statusBannerIcon" class="banner-icon" aria-hidden="true"></span>
+                <p id="statusBannerText"></p>
+                <button type="button" id="statusBannerClose" class="banner-close" aria-label="Dismiss message">&times;</button>
+            </div>
+
+            <!-- COMPANY FORM -->
+            <form id="companyForm">
+
+                <h2>Company Details</h2>
+
+                <!-- COMPANY NAME -->
+                <div class="form-group">
+
+                    <label for="companyName">
+                        Company Name
+                    </label>
+
+                    <input
+                        type="text"
+                        id="companyName"
+                        name="company-name"
+                        placeholder="Enter company name"
+                        required>
+
+                </div>
+
+                <!-- COMPANY ADDRESS -->
+                <div class="form-group">
+
+                    <label for="companyAddress">
+                        Company Address
+                    </label>
+
+                    <input
+                        type="text"
+                        id="companyAddress"
+                        name="company-address"
+                        placeholder="Enter company address (optional)">
+
+                </div>
+
+                <!-- COMPANY EMAIL -->
+                <div class="form-group">
+
+                    <label for="companyEmail">
+                        Company Email
+                    </label>
+
+                    <input
+                        type="email"
+                        id="companyEmail"
+                        name="company-email"
+                        placeholder="Enter company email (optional)">
+
+                </div>
+
+                <!-- COMPANY WEBSITE -->
+                <div class="form-group">
+
+                    <label for="companyWebsite">
+                        Company Website
+                    </label>
+
+                    <input
+                        type="url"
+                        id="companyWebsite"
+                        name="company-website"
+                        placeholder="https://example.com"
+                        >
+
+                </div>
+
+                <!-- COMPANY INDUSTRY -->
+                <div class="form-group">
+
+                    <label for="companyIndustry">
+                        Company Industry
+                    </label>
+
+                    <select
+                        id="companyIndustry"
+                        name="company-industry"
+                        required>
+
+                        <option value="">Select company industry</option>
+
+                        <option value="IT & Software">IT & Software</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Marketing & Advertising">Marketing & Advertising</option>
+                        <option value="E-commerce">E-commerce</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Retail">Retail</option>
+                        <option value="Education">Education</option>
+                        <option value="Transportation & Logistics">Transportation & Logistics</option>
+                        <option value="Energy & Utilities">Energy & Utilities</option>
+                        <option value="Construction & Real Estate">Construction & Real Estate</option>
+                        <option value="Telecommunications">Telecommunications</option>
+                        <option value="Non-Profit & NGOs">Non-Profit & NGOs</option>
+                        <option value="Government & Public Sector">Government & Public Sector</option>
+                        <option value="Media & Entertainment">Media & Entertainment</option>
+                        <option value="Hospitality & Tourism">Hospitality & Tourism</option>
+                        <option value="Agriculture & Farming">Agriculture & Farming</option>
+                        <option value="Legal Services">Legal Services</option>
+                        <option value="Consulting & Professional Services">Consulting & Professional Services</option>
+                        <option value="Other">Other</option>
+
+                    </select>
+
+                </div>
+
+                <!-- COMPANY INFORMATION -->
+                <h2>Company Information Required</h2>
+
+                <!-- SEARCHABLE CHECKBOX DROPDOWN -->
+                <div class="form-group">
+
+                    <p class="field-label">
+                        Select Company Topics
+                    </p>
+
+                    <div class="topic-dropdown" id="topicDropdown">
+
+                        <button
+                            type="button"
+                            id="topicDropdownBtn"
+                            class="topic-dropdown-btn"
+                            aria-expanded="false"
+                            aria-controls="topicDropdownMenu">
+
+                            <span id="dropdownLabel">
+                                Select company topics
+                            </span>
+
+                            <span id="dropdownArrow">▼</span>
+
+                        </button>
+
+                        <!-- DROPDOWN MENU -->
+                        <div
+                            class="topic-dropdown-menu"
+                            id="topicDropdownMenu"
+                            hidden>
+
+                            <label for="searchInput" class="visually-hidden">
+                                Search company topics
+                            </label>
+
+                            <input
+                                type="text"
+                                id="searchInput"
+                                placeholder="Search company topics..."
+                                autocomplete="off">
+
+                            <!-- TOPIC LIST -->
+                            <div id="topicOptions"></div>
+
+                            <!-- NO RESULTS -->
+                            <p id="noResults" class="no-results">
+                                No matching topics found.
+                            </p>
+
+                            <!-- DROPDOWN FOOTER -->
+                            <div class="dropdown-footer">
+
+                                <span id="dropdownCount">
+                                    0 selected
+                                </span>
+
+                                <button
+                                    type="button"
+                                    id="clearTopicsBtn">
+                                    Clear All
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- SELECTED TOPICS COUNTER -->
+                    <p id="selectedCount">
+                        0 Topics Selected
+                    </p>
+
+                    <p class="help-text">
+                        Search and select multiple company topics.
+                    </p>
+
+                </div>
+
+                <!-- SUBMIT BUTTON -->
+                <button type="submit" id="submitBtn">
+                    Create Report
+                </button>
+
+            </form>
+
+            <!-- LOADING SKELETON (shown while research is running) -->
+            <div id="loadingSkeleton" class="skeleton-wrap" aria-hidden="true" hidden>
+                <p class="skeleton-title">
+                    <span class="spinner"></span>
+                    Researching the company. This can take 10-30 seconds...
+                </p>
+                <div class="skeleton-card">
+                    <div class="skeleton-line w40"></div>
+                    <div class="skeleton-line w100"></div>
+                    <div class="skeleton-line w90"></div>
+                    <div class="skeleton-line w70"></div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-line w30"></div>
+                    <div class="skeleton-line w100"></div>
+                    <div class="skeleton-line w80"></div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-line w50"></div>
+                    <div class="skeleton-line w100"></div>
+                    <div class="skeleton-line w60"></div>
+                </div>
+            </div>
+
+            <!-- REPORT PREVIEW -->
+            <div
+                id="reportPreview"
+                class="report-preview"
+                hidden>
+
+                <h2>Company Report Preview</h2>
+
+                <div id="reportContent"></div>
+
+                <div class="report-actions">
+
+                    <button
+                        type="button"
+                        id="downloadPdfBtn">
+                        Download Report (PDF)
+                    </button>
+
+                    <button type="button" id="downloadDocxBtn" class="secondary-btn">
+                        Download Word (.docx)
+                    </button>
+
+                    <button type="button" id="downloadXlsxBtn" class="secondary-btn">
+                        Download Excel (.xlsx)
+                    </button>
+
+                    <button type="button" id="copyReportBtn" class="secondary-btn">
+                        Copy Report
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- JAVASCRIPT -->
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script src="pdf-report.js"></script>
+
+</body>
+</html>

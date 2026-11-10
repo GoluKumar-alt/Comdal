@@ -1,0 +1,1158 @@
+/* =========================================
+   COMDAL - PROFESSIONAL BUSINESS DESIGN
+   Complete style.css
+========================================= */
+
+/* ---------- Global Reset ---------- */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --navy: #142b4a;
+    --navy-light: #203f65;
+    --blue: #3569a8;
+    --blue-light: #eaf1fa;
+    --background: #f4f6f9;
+    --white: #ffffff;
+    --text: #263445;
+    --muted: #718096;
+    --border: #dfe5ed;
+    --success: #237a57;
+    --shadow: 0 5px 20px rgba(20, 43, 74, 0.07);
+
+    /* extra tokens used by dark mode */
+    --surface: #ffffff;
+    --card: #fbfcfe;
+    --heading: #142b4a;
+    --accent: #3569a8;
+    --danger: #b54747;
+    --skeleton-a: #eef2f7;
+    --skeleton-b: #e0e7f0;
+    color-scheme: light;
+}
+
+/* ---------- Dark Mode ---------- */
+
+:root[data-theme="dark"] {
+    --navy: #1b3a63;
+    --navy-light: #25497a;
+    --blue: #6aa3e6;
+    --blue-light: #1f3250;
+    --background: #0e1621;
+    --white: #ffffff;
+    --text: #d5deea;
+    --muted: #93a1b5;
+    --border: #2a3b50;
+    --success: #4cc38a;
+    --shadow: 0 5px 20px rgba(0, 0, 0, 0.35);
+
+    --surface: #162231;
+    --card: #1a293b;
+    --heading: #e8eff9;
+    --accent: #2f65a8;
+    --danger: #e07a7a;
+    --skeleton-a: #1c2c40;
+    --skeleton-b: #263a52;
+    color-scheme: dark;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    transition: background 0.25s, color 0.25s;
+    background: var(--background);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+/* ---------- Header ---------- */
+
+header {
+    background: var(--navy);
+    color: var(--white);
+    padding: 22px 6%;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+header h1,
+.header h1 {
+    font-size: 27px;
+    font-weight: 750;
+    letter-spacing: 0.5px;
+}
+
+header p,
+.header p {
+    color: #c8d5e5;
+    font-size: 13px;
+    margin-top: 3px;
+}
+
+/* ---------- Main Page ---------- */
+
+.page {
+    width: min(1100px, 92%);
+    margin: 35px auto 60px;
+}
+
+.welcome {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.welcome h1,
+.welcome h2 {
+    color: var(--heading);
+    font-size: 29px;
+    margin-bottom: 8px;
+}
+
+.welcome p {
+    color: var(--muted);
+    font-size: 15px;
+}
+
+/* ---------- Main Containers ---------- */
+
+.form-container,
+.report-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+}
+
+.form-container h2,
+.report-preview h2 {
+    color: var(--heading);
+    font-size: 21px;
+    margin-bottom: 22px;
+    padding-bottom: 13px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Form Layout ---------- */
+
+#companyForm {
+    display: flex;
+    flex-direction: column;
+    gap: 19px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.form-group label,
+.field-label {
+    color: var(--heading);
+    font-weight: 650;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea,
+#companyForm input,
+#companyForm select {
+    width: 100%;
+    min-height: 46px;
+    padding: 11px 13px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus,
+#companyForm input:focus,
+#companyForm select:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(53, 105, 168, 0.12);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--muted);
+    opacity: 0.8;
+}
+
+.help-text {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+/* ---------- Topic Dropdown ---------- */
+
+.topic-dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.topic-dropdown-btn {
+    width: 100%;
+    min-height: 46px;
+    padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    transition: 0.2s;
+}
+
+.topic-dropdown-btn:hover,
+.topic-dropdown-btn:focus {
+    border-color: var(--blue);
+    outline: none;
+}
+
+#dropdownLabel {
+    font-size: 14px;
+}
+
+#selectedCount,
+#dropdownCount {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 25px;
+    height: 25px;
+    padding: 0 7px;
+    background: var(--blue-light);
+    color: var(--heading);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.topic-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(20, 43, 74, 0.14);
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.topic-dropdown-menu input[type="text"],
+#searchInput {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    outline: none;
+}
+
+#searchInput:focus {
+    border-color: var(--blue);
+}
+
+#topicOptions {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#topicOptions label,
+#topicOptions .topic-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 9px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+#topicOptions label:hover,
+#topicOptions .topic-option:hover {
+    background: var(--blue-light);
+}
+
+#topicOptions input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    min-height: auto;
+    accent-color: var(--blue);
+    cursor: pointer;
+}
+
+.dropdown-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 12px;
+    margin-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+}
+
+#clearTopicsBtn {
+    background: transparent;
+    color: var(--danger);
+    border: none;
+    font-weight: 600;
+    padding: 5px 8px;
+}
+
+#clearTopicsBtn:hover {
+    text-decoration: underline;
+}
+
+.no-results {
+    color: var(--muted);
+    text-align: center;
+    font-size: 13px;
+    padding: 15px 5px;
+}
+
+/* ---------- Submit Button ---------- */
+
+#submitBtn,
+button[type="submit"] {
+    width: 100%;
+    min-height: 48px;
+    background: var(--navy);
+    color: var(--white);
+    border: none;
+    border-radius: 7px;
+    padding: 12px 20px;
+    font-weight: 650;
+    font-size: 15px;
+    transition: background 0.2s, transform 0.2s;
+}
+
+#submitBtn:hover,
+button[type="submit"]:hover {
+    background: var(--navy-light);
+    transform: translateY(-1px);
+}
+
+#submitBtn:disabled,
+button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ---------- Report Preview ---------- */
+
+#reportPreview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin-top: 30px;
+    box-shadow: var(--shadow);
+}
+
+#reportPreview h2 {
+    color: var(--heading);
+    font-size: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--navy);
+    margin-bottom: 20px;
+}
+
+#reportContent {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+}
+
+#reportContent h1,
+#reportContent h2,
+#reportContent h3,
+#reportContent h4 {
+    color: var(--heading);
+    margin: 24px 0 12px;
+    line-height: 1.35;
+}
+
+#reportContent h1 {
+    font-size: 25px;
+}
+
+#reportContent h2 {
+    font-size: 21px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 9px;
+}
+
+#reportContent h3 {
+    font-size: 17px;
+}
+
+#reportContent p {
+    margin-bottom: 12px;
+}
+
+#reportContent ul,
+#reportContent ol {
+    padding-left: 23px;
+    margin: 10px 0 17px;
+}
+
+#reportContent li {
+    margin-bottom: 6px;
+}
+
+#reportContent strong {
+    color: var(--heading);
+}
+
+#reportContent a {
+    color: var(--blue);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+#reportContent a:hover {
+    text-decoration: underline;
+}
+
+/* ---------- Research Result Cards ---------- */
+
+.research-result {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 7px;
+    padding: 16px 18px;
+    margin: 13px 0;
+}
+
+.research-result h3,
+.research-result h4 {
+    margin-top: 0;
+    color: var(--heading);
+}
+
+.research-result p:last-child {
+    margin-bottom: 0;
+}
+
+/* ---------- PDF Button ---------- */
+
+#downloadPdfBtn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 22px;
+    padding: 12px 22px;
+    min-height: 45px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 7px;
+    font-weight: 650;
+    transition: 0.2s;
+}
+
+#downloadPdfBtn:hover {
+    background: var(--navy);
+    transform: translateY(-1px);
+}
+
+/* ---------- Utility Classes ---------- */
+
+.fill {
+    width: 100%;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ---------- Scrollbar ---------- */
+
+.topic-dropdown-menu::-webkit-scrollbar {
+    width: 7px;
+}
+
+.topic-dropdown-menu::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+/* ---------- Responsive Design ---------- */
+
+@media (max-width: 768px) {
+    header {
+        padding: 18px 5%;
+    }
+
+    header h1,
+    .header h1 {
+        font-size: 23px;
+    }
+
+    .page {
+        width: 94%;
+        margin-top: 24px;
+    }
+
+    .welcome h1,
+    .welcome h2 {
+        font-size: 24px;
+    }
+
+    .form-container,
+    .report-preview,
+    #reportPreview {
+        padding: 20px;
+    }
+
+    #reportContent h1 {
+        font-size: 22px;
+    }
+
+    #reportContent h2 {
+        font-size: 19px;
+    }
+}
+
+@media (max-width: 480px) {
+    .form-container,
+    .report-preview,
+    #reportPreview {
+        padding: 15px;
+        border-radius: 9px;
+    }
+
+    .welcome h1,
+    .welcome h2 {
+        font-size: 21px;
+    }
+
+    .dropdown-footer {
+        flex-wrap: wrap;
+    }
+
+    #downloadPdfBtn {
+        width: 100%;
+    }
+}
+
+
+/* =========================================
+   NEW FEATURES
+========================================= */
+
+/* ---------- Theme Toggle ---------- */
+
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 38px;
+    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--white);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.theme-toggle:focus-visible,
+.secondary-btn:focus-visible,
+.link-btn:focus-visible,
+.history-open:focus-visible,
+.history-remove:focus-visible,
+.banner-close:focus-visible,
+#submitBtn:focus-visible,
+#downloadPdfBtn:focus-visible {
+    outline: 3px solid var(--blue);
+    outline-offset: 2px;
+}
+
+/* ---------- Status Banner (replaces alert popups) ---------- */
+
+.banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 15px;
+    margin-bottom: 22px;
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.banner[hidden] {
+    display: none;
+}
+
+.banner p {
+    flex: 1;
+    margin: 0;
+}
+
+.banner-icon {
+    font-weight: 700;
+    line-height: 1.6;
+}
+
+.banner-close {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 22px;
+    line-height: 1;
+    padding: 0 4px;
+    opacity: 0.7;
+}
+
+.banner-close:hover {
+    opacity: 1;
+}
+
+.banner-error {
+    background: #fdeeee;
+    border-color: #f0c4c4;
+    border-left-color: #c0392b;
+    color: #7a1f1f;
+}
+
+.banner-warning {
+    background: #fff7e6;
+    border-color: #f2dfb0;
+    border-left-color: #d99a00;
+    color: #6b4a00;
+}
+
+.banner-info {
+    background: var(--blue-light);
+    border-color: var(--border);
+    border-left-color: var(--blue);
+    color: var(--text);
+}
+
+:root[data-theme="dark"] .banner-error {
+    background: #3a1c20;
+    border-color: #5c2a30;
+    border-left-color: #e0645a;
+    color: #f3c6c6;
+}
+
+:root[data-theme="dark"] .banner-warning {
+    background: #3a2f14;
+    border-color: #5a4a1f;
+    border-left-color: #e0a92a;
+    color: #f0dba5;
+}
+
+/* ---------- Spinner + Loading Skeleton ---------- */
+
+.spinner,
+#submitBtn.loading::before {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: comdal-spin 0.7s linear infinite;
+    vertical-align: -3px;
+}
+
+#submitBtn.loading {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+#submitBtn.loading::before {
+    content: "";
+}
+
+@keyframes comdal-spin {
+    to { transform: rotate(360deg); }
+}
+
+.skeleton-wrap {
+    margin-top: 28px;
+}
+
+.skeleton-wrap[hidden] {
+    display: none;
+}
+
+.skeleton-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.skeleton-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 7px;
+    padding: 16px 18px;
+    margin: 13px 0;
+}
+
+.skeleton-line {
+    height: 12px;
+    margin: 11px 0;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--skeleton-a) 25%, var(--skeleton-b) 50%, var(--skeleton-a) 75%);
+    background-size: 200% 100%;
+    animation: comdal-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-line.w30 { width: 30%; }
+.skeleton-line.w40 { width: 40%; }
+.skeleton-line.w50 { width: 50%; }
+.skeleton-line.w60 { width: 60%; }
+.skeleton-line.w70 { width: 70%; }
+.skeleton-line.w80 { width: 80%; }
+.skeleton-line.w90 { width: 90%; }
+.skeleton-line.w100 { width: 100%; }
+
+@keyframes comdal-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner,
+    #submitBtn.loading::before,
+    .skeleton-line {
+        animation-duration: 3s;
+    }
+}
+
+/* ---------- Recent Searches ---------- */
+
+.history-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 22px;
+    box-shadow: var(--shadow);
+}
+
+.history-panel[hidden] {
+    display: none;
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.history-header h2 {
+    color: var(--heading);
+    font-size: 16px;
+}
+
+.link-btn {
+    background: transparent;
+    border: none;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 6px;
+}
+
+.link-btn:hover {
+    text-decoration: underline;
+}
+
+.history-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.history-item {
+    display: inline-flex;
+    align-items: stretch;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.history-item:hover {
+    border-color: var(--blue);
+}
+
+.history-open {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    text-align: left;
+    min-width: 0;
+}
+
+.history-open strong {
+    color: var(--heading);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.history-open small {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.history-remove {
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 18px;
+    padding: 0 11px;
+}
+
+.history-remove:hover {
+    color: var(--danger);
+    background: var(--blue-light);
+}
+
+/* ---------- Report Action Buttons ---------- */
+
+.report-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.report-actions button {
+    margin-top: 0 !important;
+}
+
+.secondary-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 45px;
+    padding: 12px 20px;
+    background: transparent;
+    color: var(--heading);
+    border: 1.5px solid var(--blue);
+    border-radius: 7px;
+    font-weight: 650;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.secondary-btn:hover {
+    background: var(--blue-light);
+    transform: translateY(-1px);
+}
+
+.secondary-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#reportContent small {
+    color: var(--muted);
+}
+
+@media (max-width: 480px) {
+    .report-actions button {
+        width: 100%;
+    }
+
+    .theme-toggle #themeToggleText {
+        display: none;
+    }
+
+    .history-panel {
+        padding: 15px;
+    }
+}
+
+/* Dark mode must never leak into the printed PDF */
+@media print {
+    :root,
+    :root[data-theme="dark"],
+    :root[data-theme="light"] {
+        --navy: #142b4a;
+        --blue: #3569a8;
+        --text: #263445;
+        --muted: #718096;
+        --heading: #142b4a;
+        --border: #dfe5ed;
+        --card: #fbfcfe;
+        --surface: #ffffff;
+        --background: #ffffff;
+    }
+}
+
+/* ==========================================
+   COMDAL - CLEAN PDF PRINT DESIGN
+========================================== */
+
+/* Normal website par print document hidden rahega */
+#comdalPrintDocument {
+    display: none;
+}
+
+@media print {
+
+    @page {
+        size: A4;
+        margin: 15mm;
+    }
+
+    html,
+    body {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: white !important;
+    }
+
+    /* Website ke baaki elements hide karo */
+    body > *:not(#comdalPrintDocument) {
+        display: none !important;
+    }
+
+    /* Sirf PDF document print hoga */
+    #comdalPrintDocument {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #263445 !important;
+        background: white !important;
+        font-family: Arial, sans-serif !important;
+        font-size: 10.5pt !important;
+        line-height: 1.65 !important;
+        visibility: visible !important;
+    }
+
+    #comdalPrintDocument * {
+        visibility: visible !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Cover page */
+    .comdal-cover {
+        min-height: 250mm;
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        page-break-after: always;
+        break-after: page;
+        background: white !important;
+    }
+
+    .comdal-cover-brand {
+        color: #142b4a !important;
+        font-size: 30pt;
+        font-weight: bold;
+        letter-spacing: 3px;
+        margin-bottom: 30px;
+    }
+
+    .comdal-cover-label,
+    .comdal-toc-label {
+        color: #3569a8 !important;
+        font-weight: bold;
+        letter-spacing: 2px;
+    }
+
+    .comdal-cover-title {
+        color: #142b4a !important;
+        font-size: 30pt;
+        line-height: 1.2;
+        margin: 20px 0;
+        overflow-wrap: anywhere;
+    }
+
+    .comdal-cover-description {
+        color: #718096 !important;
+        font-size: 14pt;
+    }
+
+    .comdal-cover-information {
+        margin-top: 35px;
+        border-top: 2px solid #142b4a;
+        padding-top: 15px;
+    }
+
+    .comdal-cover-row {
+        margin: 12px 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Table of contents */
+    .comdal-toc {
+        min-height: 250mm;
+        page-break-after: always;
+        break-after: page;
+    }
+
+    .comdal-toc-title {
+        color: #142b4a !important;
+        font-size: 25pt;
+        border-bottom: 2px solid #3569a8;
+        padding-bottom: 12px;
+    }
+
+    .comdal-toc-list {
+        padding-left: 25px;
+    }
+
+    .comdal-toc-item {
+        color: #263445 !important;
+        padding: 7px 0;
+        border-bottom: 1px solid #e5eaf0;
+    }
+
+    /* Main report */
+    .comdal-main-report {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    .comdal-main-report #reportContent {
+        display: block !important;
+        visibility: visible !important;
+        overflow: visible !important;
+        width: 100% !important;
+        font-size: 10pt !important;
+        line-height: 1.6 !important;
+        color: #263445 !important;
+    }
+
+    .comdal-main-report h1,
+    .comdal-main-report h2,
+    .comdal-main-report h3,
+    .comdal-main-report h4 {
+        color: #142b4a !important;
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+
+    .comdal-main-report h3 {
+        margin-top: 25px;
+    }
+
+    .comdal-main-report p,
+    .comdal-main-report li {
+        overflow-wrap: anywhere;
+        orphans: 3;
+        widows: 3;
+    }
+
+    .comdal-main-report .research-result {
+        background: #fbfcfe !important;
+        border: 1px solid #dfe5ed !important;
+        border-left: 4px solid #3569a8 !important;
+        padding: 12px;
+        margin: 10px 0;
+        break-inside: auto;
+    }
+
+    .comdal-main-report a {
+        color: #245b99 !important;
+        overflow-wrap: anywhere;
+    }
+
+    /* Original preview and buttons print nahi honge */
+    #reportPreview,
+    #downloadPdfBtn {
+        display: none !important;
+    }
+}
