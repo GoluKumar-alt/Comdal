@@ -1,8 +1,6 @@
 // ==========================================
-// COMDAL - EXPORT & COPY
-// Word (.docx), Excel (.xlsx) and clipboard copy.
-// No external libraries: .docx / .xlsx are just ZIP files of XML,
-// so a tiny ZIP writer below is enough.
+// COMDAL - EXPORT, COPY & PDF SYSTEM
+// PDF, Word (.docx), Excel (.xlsx) and Clipboard
 // ==========================================
 
 (function () {
@@ -12,17 +10,16 @@
     var docxBtn = document.getElementById("downloadDocxBtn");
     var xlsxBtn = document.getElementById("downloadXlsxBtn");
     var copyBtn = document.getElementById("copyReportBtn");
+    var pdfBtn = document.getElementById("downloadPdfBtn");
+    var form = document.getElementById("companyForm");
 
-    if (!reportContentEl || !docxBtn || !xlsxBtn || !copyBtn) {
-        console.error("Comdal export: required buttons are missing in index.html.");
+    if (!reportContentEl) {
+        console.error("Comdal export: reportContent element is missing in index.html.");
         return;
     }
 
 
     // ---------- 1. READ THE REPORT FROM THE PAGE ----------
-    // Result: [{ title, items: [{ kind, label, text, source, url, missing }] }]
-    // kind: "kv" (Company Details row), "fact" (research finding), "text", "link" (source list)
-
     function clean(text) {
         return String(text || "").replace(/\s+/g, " ").trim();
     }
@@ -109,6 +106,10 @@
     }
 
     function companyName() {
+        if (form && form.elements["company-name"]) {
+            var nameVal = form.elements["company-name"].value.trim();
+            if (nameVal) return nameVal;
+        }
         return window.comdalCurrentCompany || "Company";
     }
 
@@ -122,8 +123,125 @@
     }
 
 
-    // ---------- 2. MINIMAL ZIP WRITER (stored, no compression) ----------
+    // ---------- 2. PDF GENERATION FUNCTION ----------
+    function createCoverRow(label, value) {
+        const row = document.createElement("p");
+        row.className = "comdal-cover-row";
 
+        const strong = document.createElement("strong");
+        strong.textContent = label + ": ";
+
+        row.appendChild(strong);
+        row.appendChild(document.createTextNode(value || "Not provided"));
+        return row;
+    }
+
+    function buildPrintDocument() {
+        const existingDoc = document.getElementById("comdalPrintDocument");
+        if (existingDoc) {
+            existingDoc.remove();
+        }
+
+        const compName = companyName();
+        const compAddress = form && form.elements["company-address"] ? form.elements["company-address"].value.trim() : "Not provided";
+        const compEmail = form && form.elements["company-email"] ? form.elements["company-email"].value.trim() : "Not provided";
+        const compWebsite = form && form.elements["company-website"] ? form.elements["company-website"].value.trim() : "Not provided";
+        const compIndustry = form && form.elements["company-industry"] ? form.elements["company-industry"].value : "Not provided";
+        const reportDate = reportDateText();
+
+        const printDoc = document.createElement("div");
+        printDoc.id = "comdalPrintDocument";
+
+        // Cover Page
+        const cover = document.createElement("section");
+        cover.className = "comdal-cover";
+
+        const brand = document.createElement("div");
+        brand.className = "comdal-cover-brand";
+        brand.textContent = "COMDAL";
+
+        const coverLabel = document.createElement("p");
+        coverLabel.className = "comdal-cover-label";
+        coverLabel.textContent = "COMPANY RESEARCH REPORT";
+
+        const coverTitle = document.createElement("h1");
+        coverTitle.className = "comdal-cover-title";
+        coverTitle.textContent = compName;
+
+        const coverDesc = document.createElement("p");
+        coverDesc.className = "comdal-cover-description";
+        coverDesc.textContent = "Structured Company Intelligence & Topic-Wise Analysis";
+
+        const coverInfo = document.createElement("div");
+        coverInfo.className = "comdal-cover-information";
+        coverInfo.append(
+            createCoverRow("Industry", compIndustry),
+            createCoverRow("Website", compWebsite),
+            createCoverRow("Email", compEmail),
+            createCoverRow("Address", compAddress),
+            createCoverRow("Generated On", reportDate)
+        );
+
+        cover.append(brand, coverLabel, coverTitle, coverDesc, coverInfo);
+
+        // Table of Contents
+        const toc = document.createElement("section");
+        toc.className = "comdal-toc";
+
+        const tocLabel = document.createElement("p");
+        tocLabel.className = "comdal-toc-label";
+        tocLabel.textContent = "REPORT STRUCTURE";
+
+        const tocTitle = document.createElement("h2");
+        tocTitle.className = "comdal-toc-title";
+        tocTitle.textContent = "Table of Contents";
+
+        const tocList = document.createElement("ol");
+        tocList.className = "comdal-toc-list";
+
+        const sectionHeadings = reportContentEl.querySelectorAll("h3");
+        sectionHeadings.forEach(heading => {
+            const li = document.createElement("li");
+            li.className = "comdal-toc-item";
+            li.textContent = heading.textContent;
+            tocList.appendChild(li);
+        });
+
+        toc.append(tocLabel, tocTitle, tocList);
+
+        // Main Report Content
+        const mainReport = document.createElement("section");
+        mainReport.className = "comdal-main-report";
+
+        const clonedReportContent = reportContentEl.cloneNode(true);
+        mainReport.appendChild(clonedReportContent);
+
+        printDoc.append(cover, toc, mainReport);
+        document.body.appendChild(printDoc);
+
+        return compName;
+    }
+
+    if (pdfBtn) {
+        pdfBtn.addEventListener("click", function () {
+            if (!reportContentEl.innerHTML.trim()) {
+                alert("Please generate a company report first before downloading.");
+                return;
+            }
+
+            const compName = buildPrintDocument();
+            const originalTitle = document.title;
+            const safeFileNamePdf = compName.replace(/[^a-zA-Z0-9_-]/g, "_");
+            document.title = `${safeFileNamePdf}_Comdal_Report`;
+
+            window.print();
+
+            document.title = originalTitle;
+        });
+    }
+
+
+    // ---------- 3. MINIMAL ZIP WRITER FOR DOCX/XLSX ----------
     var crcTable = (function () {
         var table = new Uint32Array(256);
         for (var n = 0; n < 256; n++) {
@@ -162,8 +280,8 @@
             var local = new DataView(new ArrayBuffer(30));
             local.setUint32(0, 0x04034B50, true);
             local.setUint16(4, 20, true);
-            local.setUint16(6, 0x0800, true);      // UTF-8 names
-            local.setUint16(8, 0, true);           // stored
+            local.setUint16(6, 0x0800, true);
+            local.setUint16(8, 0, true);
             local.setUint16(10, dosTime, true);
             local.setUint16(12, dosDate, true);
             local.setUint32(14, crc, true);
@@ -226,8 +344,7 @@
     }
 
 
-    // ---------- 3. WORD (.docx) ----------
-
+    // ---------- 4. WORD (.docx) ----------
     var W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
     function wRun(text, opts) {
@@ -257,7 +374,7 @@
     function buildDocumentXml(sections) {
         var body = "";
 
-        body += wPara(wRun("Company Research Report", { }), { style: "Title" });
+        body += wPara(wRun("Company Research Report", {}), { style: "Title" });
         body += wPara(wRun(companyName(), { bold: true, size: 30, color: "3569A8" }), { spacing: [0, 40] });
         body += wPara(wRun("Generated by Comdal on " + reportDateText(), { italic: true, color: "718096", size: 18 }), { spacing: [0, 200] });
 
@@ -305,7 +422,6 @@
                     return;
                 }
 
-                // plain text / list item
                 var isListItem = section.items.length > 1 && item.kind === "text" && !item.label && section.title === "Selected Research Topics";
                 body += isListItem
                     ? wPara(wRun("•\t" + item.text), { indent: [360, 360], spacing: [0, 20] })
@@ -370,8 +486,7 @@
     }
 
 
-    // ---------- 4. EXCEL (.xlsx) ----------
-
+    // ---------- 5. EXCEL (.xlsx) ----------
     function buildRows(sections) {
         var rows = [["Section", "Field", "Information", "Source / Link"]];
 
@@ -426,7 +541,7 @@
         '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>' +
         '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>' +
         '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
-        '<fill><patternFill patternType="solid"><fgColor rgb="FF142B4A"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+        '<fill><patternFill patternType="solid"><fgColor rgb="FF142B4A"/><bgColor indexed="64"/></patternFill></fills>' +
         '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
         '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
         '<cellXfs count="2">' +
@@ -475,8 +590,7 @@
     }
 
 
-    // ---------- 5. COPY TO CLIPBOARD ----------
-
+    // ---------- 6. COPY TO CLIPBOARD ----------
     function buildPlainText(sections) {
         var lines = [
             "COMPANY RESEARCH REPORT - " + companyName(),
@@ -501,7 +615,7 @@
                     }
                     lines.push(item.missing ? "  " + item.text : "  - " + item.text + (item.source ? " (Source: " + item.source + ")" : ""));
                 } else if (item.kind === "link") {
-                    lines.push("- " + item.text + " - " + item.url);
+                    lines.push("\n- " + item.text + "\n" + item.url);
                 } else {
                     lines.push(item.text);
                 }
@@ -539,15 +653,14 @@
                 await navigator.clipboard.writeText(text);
                 return true;
             } catch (error) {
-                // fall through to the old method
+                // fall through
             }
         }
         return fallbackCopy(text);
     }
 
 
-    // ---------- 6. BUTTON EVENTS ----------
-
+    // ---------- 7. BUTTON EVENTS ----------
     function report() {
         var sections = collectReport();
         if (!sections.length) {
@@ -575,50 +688,55 @@
         }, 2000);
     }
 
-    docxBtn.addEventListener("click", function () {
-        var sections = report();
-        if (!sections) return;
+    if (docxBtn) {
+        docxBtn.addEventListener("click", function () {
+            var sections = report();
+            if (!sections) return;
 
-        try {
-            downloadBlob(
-                buildDocx(sections),
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                safeFileName("docx")
-            );
-        } catch (error) {
-            console.error("Comdal DOCX export failed:", error);
-            notify("error", "Could not create the Word file. Please try again.");
-        }
-    });
+            try {
+                downloadBlob(
+                    buildDocx(sections),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    safeFileName("docx")
+                );
+            } catch (error) {
+                console.error("Comdal DOCX export failed:", error);
+                notify("error", "Could not create the Word file. Please try again.");
+            }
+        });
+    }
 
-    xlsxBtn.addEventListener("click", function () {
-        var sections = report();
-        if (!sections) return;
+    if (xlsxBtn) {
+        xlsxBtn.addEventListener("click", function () {
+            var sections = report();
+            if (!sections) return;
 
-        try {
-            downloadBlob(
-                buildXlsx(sections),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                safeFileName("xlsx")
-            );
-        } catch (error) {
-            console.error("Comdal XLSX export failed:", error);
-            notify("error", "Could not create the Excel file. Please try again.");
-        }
-    });
+            try {
+                downloadBlob(
+                    buildXlsx(sections),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    safeFileName("xlsx")
+                );
+            } catch (error) {
+                console.error("Comdal XLSX export failed:", error);
+                notify("error", "Could not create the Excel file. Please try again.");
+            }
+        });
+    }
 
-    copyBtn.addEventListener("click", async function () {
-        var sections = report();
-        if (!sections) return;
+    if (copyBtn) {
+        copyBtn.addEventListener("click", async function () {
+            var sections = report();
+            if (!sections) return;
 
-        var ok = await copyText(buildPlainText(sections));
-        flashLabel(copyBtn, ok ? "Copied ✓" : "Copy failed");
+            var ok = await copyText(buildPlainText(sections));
+            flashLabel(copyBtn, ok ? "Copied ✓" : "Copy failed");
 
-        if (!ok) {
-            notify("error", "Could not copy automatically. Please select the report text and copy it manually.");
-        }
-    });
+            if (!ok) {
+                notify("error", "Could not copy automatically. Please select the report text and copy it manually.");
+            }
+        });
+    }
 
-    // exposed for testing / reuse
     window.ComdalExport = { collectReport: collectReport, buildPlainText: buildPlainText };
 })();
