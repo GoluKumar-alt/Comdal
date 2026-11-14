@@ -1066,16 +1066,39 @@ function addUsedSources(matches, usedSources, brandInfo) {
 
 // 13. DISPLAY ONE TOPIC IN ITS OWN STRUCTURE
 
-function displayTopicSection(topicName, results, usedSources, companyName, brandInfo, usedSentencesGlobal) {
+// FIX: written answer for the topic (comes from the server), shown first
+function addTopicAnswer(answer) {
+    const article = document.createElement("article");
+    article.className = "research-result";
+
+    const heading = document.createElement("h4");
+    heading.textContent = "Key Findings";
+    article.appendChild(heading);
+
+    const paragraph = document.createElement("p");
+    paragraph.textContent = answer;
+    article.appendChild(paragraph);
+
+    reportContent.appendChild(article);
+}
+
+function displayTopicSection(topicName, results, usedSources, companyName, brandInfo, usedSentencesGlobal, topicAnswer) {
     const schema = topicSchemas[topicName];
     if (!schema) return;
 
     addHeading(schema.title);
 
+    const hasAnswer = typeof topicAnswer === "string" && topicAnswer.trim().length > 30;
+    if (hasAnswer) {
+        addTopicAnswer(topicAnswer.trim());
+    }
+
     const matches = getMatchingSources(results, schema, brandInfo, topicName);
 
     if (matches.length === 0) {
-        addParagraph("No sufficiently relevant information was found for this topic.");
+        if (!hasAnswer) {
+            addParagraph("No sufficiently relevant information was found for this topic.");
+        }
         return;
     }
 
@@ -1109,7 +1132,7 @@ function displayTopicSection(topicName, results, usedSources, companyName, brand
 
 // 14. GENERATE THE COMPLETE REPORT
 
-function generateProfessionalReport(company, results, aiSummary = "") {
+function generateProfessionalReport(company, results, aiSummary = "", topicAnswers = {}) {
     const safeResults = Array.isArray(results) ? results : [];
     const usedSources = [];
     const usedSentencesGlobal = new Set();
@@ -1147,7 +1170,8 @@ function generateProfessionalReport(company, results, aiSummary = "") {
             usedSources,
             company.companyName,
             brandInfo,
-            usedSentencesGlobal
+            usedSentencesGlobal,
+            (topicAnswers || {})[topicName] || ""
         );
     });
 
@@ -1357,6 +1381,7 @@ function addToHistory(companyData, result) {
         savedAt: new Date().toISOString(),
         companyData,
         aiSummary: result.aiSummary || "",
+        topicAnswers: result.topicAnswers || {},
         searchResults: (result.searchResults || []).map(item => ({
             title: item.title || "",
             url: item.url || "",
@@ -1464,7 +1489,8 @@ function renderReport(companyData, result) {
     generateProfessionalReport(
         companyData,
         result.searchResults,
-        result.aiSummary
+        result.aiSummary,
+        result.topicAnswers || {}
     );
 
     // used by export.js for file names
