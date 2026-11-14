@@ -612,9 +612,11 @@ function resolveCanonicalBrand(userCompanyName, aiSummary, results) {
 
     const firstWord = baseWords[0];
 
-    // If user already typed 2+ words (e.g. "Maruti Suzuki"), use that directly
+    // FIX: If the user typed 2+ words (e.g. "Space X", "Maruti Suzuki"), do NOT
+    // build a strict brand filter. Names like "Space X" vs "SpaceX" would otherwise
+    // block many correct sentences ("Space Exploration Technologies", "space transportation").
     if (baseWords.length >= 2) {
-        return { base: firstWord, secondWord: baseWords[1] };
+        return { base: firstWord, secondWord: "" };
     }
 
     const genericSuffixes = new Set([
@@ -791,6 +793,7 @@ function extractCleanSentences(rawContent, brandInfo) {
         // Protect common abbreviations before splitting on periods
         const protectedText = chunk
             .replace(/https?:\/\/\S+|www\.\S+/gi, "")
+            .replace(/\[\d+\]/g, "")   // FIX: remove citation numbers like [1], [23] (Wikipedia)
             .replace(/Image\s*\d+\s*:/gi, "")
             .replace(/\b(Start searching|Sign in to view[^.]*|Unlock [A-Za-z &]+)\b/gi, "")
             .replace(/\b(No|Ltd|Inc|Corp|Co|Pvt|Dr|Mr|St|Ave|Rd)\./gi, "$1")
@@ -818,9 +821,14 @@ function extractCleanSentences(rawContent, brandInfo) {
 function scoreSentenceForField(sentence, field, companyName) {
     const lower = sentence.toLowerCase();
     const compLower = (companyName || "").toLowerCase();
+    // FIX: "Space X" should also match "SpaceX" (compare without spaces)
+    const compCompact = compLower.replace(/\s+/g, "");
     let score = 0;
 
-    if (compLower && lower.includes(compLower)) {
+    if (compLower && (
+        lower.includes(compLower) ||
+        (compCompact && lower.replace(/\s+/g, "").includes(compCompact))
+    )) {
         score += 3;
     }
 
@@ -1113,10 +1121,9 @@ function generateProfessionalReport(company, results, aiSummary = "") {
         summaryCard.appendChild(summaryPara);
         reportContent.appendChild(summaryCard);
 
-        // Register Executive Summary sentences into usedSentencesGlobal
-        // so individual fields don't repeat the exact same lines
-        const summarySentences = extractCleanSentences(aiSummary, brandInfo);
-        summarySentences.forEach(s => usedSentencesGlobal.add(normalizeText(s)));
+        // FIX: Summary sentences are NOT added to usedSentencesGlobal anymore.
+        // Before, the 4-word phrase check blocked good field sentences
+        // (Falcon 9, Starship, etc.) just because the summary mentioned them.
     }
 
     let topicsToDisplay = [];
