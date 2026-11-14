@@ -1,6 +1,6 @@
 // ==========================================
 // COMDAL - COMPANY RESEARCH BACKEND
-// Updated server.js (per-topic Tavily search)
+// Complete Updated server.js (per-topic research)
 // ==========================================
 
 const express = require("express");
@@ -25,6 +25,11 @@ if (!process.env.TAVILY_API_KEY) {
 const tvly = tavily({
     apiKey: process.env.TAVILY_API_KEY
 });
+
+// Research settings (change here if you want fewer / more Tavily requests)
+const RESULTS_PER_TOPIC = 5;       // sources fetched for each topic
+const PARALLEL_SEARCHES = 6;       // how many Tavily requests run at the same time
+const TOPIC_SEARCH_DEPTH = "basic"; // "basic" = 1 credit, "advanced" = 2 credits per topic
 
 
 // ==========================================
@@ -225,147 +230,91 @@ function classifyResearchError(error) {
 
 
 // ==========================================
-// 3D. PER-TOPIC TAVILY SEARCH
+// 3D. PER-TOPIC RESEARCH HELPERS
 // ==========================================
-// Instead of one giant query (which got cut at 380 characters and only
-// covered the first few topics), every selected topic gets its own search.
+// Old version: ONE search with all topic words joined together and cut at
+// 380 characters, so for "All About Company" only the first few topics were
+// ever searched. New version: one short search per topic, merged together.
 
-// These topics are about recent events, so use Tavily's news mode
-const NEWS_TOPICS = new Set([
-    "Latest News & Updates",
-    "Company Press Releases",
-    "Company Events & Conferences"
-]);
-
-// For these topics the company's own website is searched as well
-const OFFICIAL_SITE_TOPICS = new Set([
-    "Company Overview",
-    "Company Mission & Vision",
-    "Contact Information",
-    "Career & Job Opportunities",
-    "Products & Services",
-    "Company Branches & Locations",
-    "Company Policies & Ethics",
-    "Company Sustainability & CSR Initiatives",
-    "Company Press Releases"
-]);
-
-function getDomain(url) {
-    if (!url) return "";
-    try {
-        const value = String(url).trim();
-        return new URL(/^https?:\/\//i.test(value) ? value : "https://" + value)
-            .hostname.replace(/^www\./, "");
-    } catch (error) {
-        return "";
-    }
+function cleanQuery(text) {
+    return String(text).replace(/\s+/g, " ").trim().slice(0, 380);
 }
 
-async function searchOneTopic(companyName, industry, topic, website) {
+// Runs the jobs a few at a time so we do not hit Tavily rate limits.
+async function runInBatches(jobs, batchSize) {
+    const settled = [];
+
+    for (let i = 0; i < jobs.length; i += batchSize) {
+        const batch = jobs.slice(i, i + batchSize);
+        const part = await Promise.allSettled(batch.map(job => job()));
+        settled.push(...part);
+    }
+
+    return settled;
+}
+
+// Search one topic and mark every result with the topic it was found for.
+async function searchOneTopic(companyName, industry, topic) {
     const terms = topicSearchTerms[topic] || topic;
-    const query = `"${companyName}" ${industry} ${terms}`.slice(0, 390);
+    const industryPart = industry && industry !== "Other" ? industry : "";
+    const query = cleanQuery([companyName, industryPart, terms].join(" "));
 
-    const options = {
+    const response = await tvly.search(query, {
+        searchDepth: TOPIC_SEARCH_DEPTH,
+        maxResults: RESULTS_PER_TOPIC
+    });
+
+    return (response.results || []).map(item => ({ ...item, topics: [topic] }));
+}
+
+// One general search that also gives the Executive Summary.
+async function searchOverview(companyName, industry) {
+    const industryPart = industry && industry !== "Other" ? industry : "";
+    const query = cleanQuery([
+        companyName,
+        industryPart,
+        "company overview history headquarters products founders"
+    ].join(" "));
+
+    const response = await tvly.search(query, {
         searchDepth: "advanced",
-        chunksPerSource: 3,
-        maxResults: 8,
-        includeAnswer: "advanced"
-    };
-
-    if (NEWS_TOPICS.has(topic)) {
-        options.topic = "news";
-        options.timeRange = "year";
-    }
-
-    const searches = [tvly.search(query, options)];
-
-    // Extra search restricted to the company's official website
-    const domain = getDomain(website);
-    if (domain && OFFICIAL_SITE_TOPICS.has(topic)) {
-        searches.push(
-            tvly.search(query, {
-                searchDepth: "advanced",
-                chunksPerSource: 3,
-                maxResults: 5,
-                includeDomains: [domain]
-            })
-        );
-    }
-
-    const settled = await Promise.allSettled(searches);
-    const fulfilled = settled
-        .filter(s => s.status === "fulfilled")
-        .map(s => s.value);
-
-    if (fulfilled.length === 0) {
-        throw settled[0].reason;
-    }
-
-    return {
-        topic,
-        answer: fulfilled[0].answer || "",
-        results: fulfilled.flatMap(r => r.results || [])
-    };
-}
-
-// Run topics in small batches so Tavily rate limits are not hit
-async function searchAllTopics(companyName, industry, topicList, website) {
-    const BATCH_SIZE = 4;
-    const done = [];
-    let firstError = null;
-
-    for (let i = 0; i < topicList.length; i += BATCH_SIZE) {
-        const batch = topicList.slice(i, i + BATCH_SIZE);
-
-        const settled = await Promise.allSettled(
-            batch.map(topic => searchOneTopic(companyName, industry, topic, website))
-        );
-
-        settled.forEach(s => {
-            if (s.status === "fulfilled") {
-                done.push(s.value);
-            } else {
-                console.error("Topic search failed:", s.reason?.message || s.reason);
-                if (!firstError) firstError = s.reason;
-            }
-        });
-    }
-
-    // Only fail completely if every topic failed
-    if (done.length === 0 && firstError) throw firstError;
-
-    return done;
-}
-
-// Merge results by URL and remember which topics each source came from
-function mergeResults(topicSearches) {
-    const byUrl = new Map();
-    const topicAnswers = {};
-
-    topicSearches.forEach(({ topic, answer, results }) => {
-        if (answer) topicAnswers[topic] = answer;
-
-        results.forEach(item => {
-            const key = String(item.url || "").toLowerCase().replace(/\/+$/, "");
-            if (!key) return;
-
-            const existing = byUrl.get(key);
-
-            if (existing) {
-                if (!existing.topics.includes(topic)) existing.topics.push(topic);
-                if (String(item.content || "").length > String(existing.content || "").length) {
-                    existing.content = item.content;
-                }
-            } else {
-                byUrl.set(key, { ...item, topics: [topic] });
-            }
-        });
+        includeAnswer: "advanced",
+        maxResults: 10
     });
 
     return {
-        searchResults: [...byUrl.values()],
-        topicAnswers
+        answer: response.answer || "",
+        results: (response.results || []).map(item => ({ ...item, topics: [] }))
     };
+}
+
+// Merge results by URL. If the same page is found for several topics, keep it once
+// and remember all its topics.
+function mergeResults(resultLists) {
+    const byUrl = new Map();
+
+    resultLists.flat().forEach(item => {
+        if (!item || !item.url) return;
+
+        const key = String(item.url).trim().toLowerCase().replace(/\/+$/, "");
+        const existing = byUrl.get(key);
+
+        if (!existing) {
+            byUrl.set(key, { ...item, topics: [...(item.topics || [])] });
+            return;
+        }
+
+        (item.topics || []).forEach(topic => {
+            if (!existing.topics.includes(topic)) existing.topics.push(topic);
+        });
+
+        // keep the longer text, it usually has more facts
+        if (String(item.content || "").length > String(existing.content || "").length) {
+            existing.content = item.content;
+        }
+    });
+
+    return Array.from(byUrl.values());
 }
 
 
@@ -427,38 +376,52 @@ app.post("/api/company-research", async (req, res) => {
             });
         }
 
-        // Topics that will actually be searched (one Tavily search each)
-        const topicList = topics.includes("All About Company")
+        // Which topics need their own search
+        const topicsToSearch = topics.includes("All About Company")
             ? Object.keys(topicSearchTerms)
-            : topics.filter(topic => topicSearchTerms[topic]);
-
-        if (topicList.length === 0) {
-            return res.status(400).json({
-                success: false,
-                code: "BAD_REQUEST",
-                message: "None of the selected topics are supported."
-            });
-        }
+            : topics.filter(topic => topic !== "All About Company");
 
         console.log("--------------------------------");
         console.log("COMDAL RESEARCH STARTED");
         console.log("Company:", companyName);
-        console.log("Topics to search:", topicList.length, topicList);
-        console.log("Official website:", getDomain(companyWebsite) || "not provided");
+        console.log("Topics to search:", topicsToSearch.length, topicsToSearch);
         console.log("--------------------------------");
 
         try {
-            const topicSearches = await searchAllTopics(
-                companyName,
-                industry,
-                topicList,
-                companyWebsite
-            );
+            // 1 overview search (gives the summary) + 1 search per topic
+            const jobs = [
+                () => searchOverview(companyName, industry),
+                ...topicsToSearch.map(topic => () => searchOneTopic(companyName, industry, topic))
+            ];
 
-            const { searchResults, topicAnswers } = mergeResults(topicSearches);
+            const settled = await runInBatches(jobs, PARALLEL_SEARCHES);
 
-            console.log("Topics researched:", topicSearches.length, "/", topicList.length);
-            console.log("Unique sources found:", searchResults.length);
+            const failures = settled.filter(item => item.status === "rejected");
+            const successes = settled.filter(item => item.status === "fulfilled");
+
+            // Everything failed -> report the real error (bad key, rate limit, network...)
+            if (successes.length === 0) {
+                throw failures[0].reason;
+            }
+
+            if (failures.length > 0) {
+                console.warn(failures.length + " of " + settled.length + " searches failed:",
+                    String(failures[0].reason?.message || failures[0].reason));
+            }
+
+            const overviewOutcome = settled[0];
+            const overview = overviewOutcome.status === "fulfilled"
+                ? overviewOutcome.value
+                : { answer: "", results: [] };
+
+            const topicResults = settled
+                .slice(1)
+                .filter(item => item.status === "fulfilled")
+                .map(item => item.value);
+
+            const searchResults = mergeResults([overview.results, ...topicResults]);
+
+            console.log("Research Results Found:", searchResults.length);
 
             const payload = {
                 success: true,
@@ -471,12 +434,15 @@ app.post("/api/company-research", async (req, res) => {
                     industry,
                     topics
                 },
-                aiSummary: topicAnswers[topicList[0]] || "",
-                topicAnswers,
-                searchResults
+                aiSummary: overview.answer || "",
+                searchResults,
+                partial: failures.length > 0
             };
 
-            saveCacheEntry(cacheKey, payload);
+            // Do not cache a partly failed research for 24 hours
+            if (failures.length === 0) {
+                saveCacheEntry(cacheKey, payload);
+            }
 
             return res.json({ ...payload, cached: false, stale: false });
 
