@@ -264,10 +264,23 @@ async function searchOneTopic(companyName, industry, topic) {
 
     const response = await tvly.search(query, {
         searchDepth: TOPIC_SEARCH_DEPTH,
-        maxResults: RESULTS_PER_TOPIC
+        maxResults: RESULTS_PER_TOPIC,
+        includeAnswer: true
     });
 
-    return (response.results || []).map(item => ({ ...item, topics: [topic] }));
+    const results = (response.results || []).map(item => ({ ...item, topics: [topic] }));
+
+    // FIX: also return a short written answer for this topic. The old code only
+    // tried to pick sentences with fixed keywords, which fails when the page
+    // says the same thing in different words (e.g. "promoted by" instead of "founder").
+    // The answer is used only if at least one result really mentions the company.
+    const related = results.filter(item => mentionsCompany(item, companyName));
+
+    return {
+        topic,
+        results,
+        answer: related.length > 0 ? String(response.answer || "").trim() : ""
+    };
 }
 
 // One general search that also gives the Executive Summary.
@@ -443,7 +456,14 @@ app.post("/api/company-research", async (req, res) => {
                 .filter(item => item.status === "fulfilled")
                 .map(item => item.value);
 
-            const mergedResults = mergeResults([overview.results, ...topicResults]);
+            const topicAnswers = {};
+            topicResults.forEach(item => {
+                if (item.answer && item.answer.length > 30) {
+                    topicAnswers[item.topic] = item.answer;
+                }
+            });
+
+            const mergedResults = mergeResults([overview.results, ...topicResults.map(item => item.results)]);
 
             // keep only pages that really mention this company
             const relevantResults = mergedResults.filter(item => mentionsCompany(item, companyName));
@@ -464,6 +484,7 @@ app.post("/api/company-research", async (req, res) => {
                     topics
                 },
                 aiSummary: overview.answer || "",
+                topicAnswers,
                 searchResults,
                 partial: failures.length > 0
             };
