@@ -255,9 +255,12 @@ async function runInBatches(jobs, batchSize) {
 
 // Search one topic and mark every result with the topic it was found for.
 async function searchOneTopic(companyName, industry, topic) {
-    const terms = topicSearchTerms[topic] || topic;
+    // FIX: keep the company name strong. Long generic topic words (like "CEO
+    // biography education leadership") used to pull in other companies, so we
+    // quote the name and use only the first few topic words.
+    const terms = (topicSearchTerms[topic] || topic).split(" ").slice(0, 6).join(" ");
     const industryPart = industry && industry !== "Other" ? industry : "";
-    const query = cleanQuery([companyName, industryPart, terms].join(" "));
+    const query = cleanQuery(['"' + companyName + '"', industryPart, terms].join(" "));
 
     const response = await tvly.search(query, {
         searchDepth: TOPIC_SEARCH_DEPTH,
@@ -271,7 +274,7 @@ async function searchOneTopic(companyName, industry, topic) {
 async function searchOverview(companyName, industry) {
     const industryPart = industry && industry !== "Other" ? industry : "";
     const query = cleanQuery([
-        companyName,
+        '"' + companyName + '"',
         industryPart,
         "company overview history headquarters products founders"
     ].join(" "));
@@ -286,6 +289,27 @@ async function searchOverview(companyName, industry) {
         answer: response.answer || "",
         results: (response.results || []).map(item => ({ ...item, topics: [] }))
     };
+}
+
+// FIX: drop pages that never mention the searched company.
+// "orbit resort" must not return "In Orbit Aerospace" or "Orbitz".
+function normalizeForMatch(text) {
+    return String(text || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+function mentionsCompany(item, companyName) {
+    const name = normalizeForMatch(companyName);
+    if (!name) return true;
+
+    const text = normalizeForMatch((item.title || "") + " " + (item.content || ""));
+    if (text.includes(name)) return true;
+
+    // "Space X" should also match "SpaceX"
+    const nameCompact = name.replace(/ /g, "");
+    return nameCompact.length >= 4 && text.replace(/ /g, "").includes(nameCompact);
 }
 
 // Merge results by URL. If the same page is found for several topics, keep it once
@@ -419,9 +443,14 @@ app.post("/api/company-research", async (req, res) => {
                 .filter(item => item.status === "fulfilled")
                 .map(item => item.value);
 
-            const searchResults = mergeResults([overview.results, ...topicResults]);
+            const mergedResults = mergeResults([overview.results, ...topicResults]);
 
-            console.log("Research Results Found:", searchResults.length);
+            // keep only pages that really mention this company
+            const relevantResults = mergedResults.filter(item => mentionsCompany(item, companyName));
+            const searchResults = relevantResults.length > 0 ? relevantResults : mergedResults;
+
+            console.log("Research Results Found:", searchResults.length,
+                "(removed " + (mergedResults.length - relevantResults.length) + " unrelated)");
 
             const payload = {
                 success: true,
