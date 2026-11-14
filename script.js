@@ -737,7 +737,7 @@ function isTooSimilar(sentence, existingSet, companyName) {
 function isSentenceCleanAndComplete(s, brandInfo) {
     const text = s.trim();
 
-    if (text.length < 45 || text.length > 250) return false;
+    if (text.length < 45 || text.length > 320) return false;
     if (!/^[A-Z]/.test(text) || !/[.!?]$/.test(text)) return false;
 
     // Reject sentences that ended prematurely on an abbreviation like "Plot No." or "Inc."
@@ -887,7 +887,7 @@ function scoreSentenceForField(sentence, field, companyName) {
 
 // 9. FIND RELEVANT SOURCES FOR EACH TOPIC
 
-function getMatchingSources(results, schema, brandInfo) {
+function getMatchingSources(results, schema, brandInfo, topicName) {
     const safeResults = Array.isArray(results) ? results : [];
     const topicKeywords = schema.keywords || [];
 
@@ -900,6 +900,12 @@ function getMatchingSources(results, schema, brandInfo) {
             const title = item.title || "";
             const content = item.content || item.snippet || "";
             let score = 0;
+
+            // FIX: the server now searches every topic separately and tags each
+            // result with its topic. Sources found for this topic get a big bonus.
+            if (topicName && Array.isArray(item.topics) && item.topics.includes(topicName)) {
+                score += 8;
+            }
 
             topicKeywords.forEach(keyword => {
                 if (containsKeyword(title, keyword)) score += 3;
@@ -919,7 +925,7 @@ function getMatchingSources(results, schema, brandInfo) {
     return matches
         .filter(source => source.score >= 1)
         .sort((a, b) => b.score - a.score)
-        .slice(0, 8);
+        .slice(0, 10);
 }
 
 
@@ -1066,7 +1072,7 @@ function displayTopicSection(topicName, results, usedSources, companyName, brand
 
     addHeading(schema.title);
 
-    const matches = getMatchingSources(results, schema, brandInfo);
+    const matches = getMatchingSources(results, schema, brandInfo, topicName);
 
     if (matches.length === 0) {
         addParagraph("No sufficiently relevant information was found for this topic.");
@@ -1300,7 +1306,7 @@ applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dar
 
 const HISTORY_KEY = "comdalHistory";
 const HISTORY_MAX_ENTRIES = 10;
-const HISTORY_MAX_CONTENT = 4000;
+const HISTORY_MAX_CONTENT = 2000;
 
 function readHistory() {
     try {
@@ -1354,6 +1360,7 @@ function addToHistory(companyData, result) {
         searchResults: (result.searchResults || []).map(item => ({
             title: item.title || "",
             url: item.url || "",
+            topics: Array.isArray(item.topics) ? item.topics : [],
             content: String(item.content || item.snippet || "").slice(0, HISTORY_MAX_CONTENT)
         }))
     };
