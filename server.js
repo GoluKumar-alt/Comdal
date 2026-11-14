@@ -236,6 +236,36 @@ function classifyResearchError(error) {
 // 380 characters, so for "All About Company" only the first few topics were
 // ever searched. New version: one short search per topic, merged together.
 
+// Sites that publish MCA (Ministry of Corporate Affairs) company data
+const INDIA_COMPANY_SITES = [
+    "tofler.in",
+    "instafinancials.com",
+    "thecompanycheck.com",
+    "qorpiq.com",
+    "paperli.ai",
+    "filesure.in",
+    "zaubacorp.com",
+    "indiafilings.com",
+    "infyner.com",
+    "mca.gov.in",
+    "careratings.com",
+    "screener.in"
+];
+
+// Topics whose facts are usually found on those sites
+const DIRECTORY_TOPICS = new Set([
+    "Founder & CEO Details",
+    "Company History",
+    "Company Overview",
+    "Company Size (Employees)",
+    "Company Branches & Locations",
+    "Contact Information",
+    "Annual Revenue / Business Growth",
+    "Company Financial Statements",
+    "Company Legal & Regulatory Compliance",
+    "Company Stock Information"
+]);
+
 function cleanQuery(text) {
     return String(text).replace(/\s+/g, " ").trim().slice(0, 380);
 }
@@ -254,33 +284,175 @@ async function runInBatches(jobs, batchSize) {
 }
 
 // Search one topic and mark every result with the topic it was found for.
-async function searchOneTopic(companyName, industry, topic) {
-    // FIX: keep the company name strong. Long generic topic words (like "CEO
-    // biography education leadership") used to pull in other companies, so we
-    // quote the name and use only the first few topic words.
-    const terms = (topicSearchTerms[topic] || topic).split(" ").slice(0, 6).join(" ");
-    const industryPart = industry && industry !== "Other" ? industry : "";
-    const query = cleanQuery(['"' + companyName + '"', industryPart, terms].join(" "));
+// Answers like "The sources do not provide ..." or answers that talk about other
+// companies are useless, so they are not shown.
+const NEGATIVE_ANSWER = /(do(es)?\s+not|don't|doesn't|did\s+not|no)\s+(specific\s+)?(provide|mention|specify|contain|include|list|have|information|details)|not\s+(found|available|mentioned|specified|provided)|cannot\s+(find|be\s+determined)|unable\s+to\s+(find|determine)/i;
 
-    const response = await tvly.search(query, {
-        searchDepth: TOPIC_SEARCH_DEPTH,
-        maxResults: RESULTS_PER_TOPIC,
-        includeAnswer: true
+function isUsableAnswer(answer, relatedCount, foundCount) {
+    const text = String(answer || "").trim();
+    if (text.length <= 30) return false;
+    if (NEGATIVE_ANSWER.test(text)) return false;
+    // most of the pages behind the answer must really be about this company
+    return foundCount > 0 && relatedCount / foundCount >= 0.5;
+}
+
+// India: Corporate Identification Number, e.g. U55101CH1988PLC008156.
+// It identifies exactly one company, so it is the best way to avoid look-alike names.
+function findCIN(texts) {
+    const regex = /\b[UL]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/g;
+    const counts = new Map();
+
+    texts.forEach(text => {
+        (String(text || "").match(regex) || []).forEach(cin => {
+            counts.set(cin, (counts.get(cin) || 0) + 1);
+        });
     });
 
-    const results = (response.results || []).map(item => ({ ...item, topics: [topic] }));
+    let best = "";
+    let bestCount = 0;
+    counts.forEach((count, cin) => {
+        if (count > bestCount) {
+            best = cin;
+            bestCount = count;
+        }
+    });
 
-    // FIX: also return a short written answer for this topic. The old code only
-    // tried to pick sentences with fixed keywords, which fails when the page
-    // says the same thing in different words (e.g. "promoted by" instead of "founder").
-    // The answer is used only if at least one result really mentions the company.
-    const related = results.filter(item => mentionsCompany(item, companyName));
+    return best;
+}
 
-    return {
-        topic,
-        results,
-        answer: related.length > 0 ? String(response.answer || "").trim() : ""
+// Decides if a page is about THIS company.
+//  - CIN found in the page or its URL            -> yes
+//  - official name has Limited/Ltd/Pvt (strict)  -> the full official name must appear
+//    (so "OCEAN ORBIT RESORT" no longer matches "Orbit Resorts Limited")
+//  - otherwise                                   -> the typed name must appear
+function makeCompanyMatcher(companyName, officialName, cin) {
+    const official = normalizeForMatch(officialName || "");
+    const hasLegalSuffix = /\b(limited|ltd|inc|corporation|corp|pvt|private|llc)$/.test(official);
+    const cinLower = String(cin || "").toLowerCase();
+
+    const variants = [official];
+    if (/\blimited$/.test(official)) variants.push(official.replace(/\blimited$/, "ltd"));
+    if (/\bltd$/.test(official)) variants.push(official.replace(/\bltd$/, "limited"));
+
+    return function matches(item) {
+        const url = String(item.url || "").toLowerCase();
+        if (cinLower && url.includes(cinLower)) return true;
+
+        const text = normalizeForMatch((item.title || "") + " " + (item.content || ""));
+        if (cinLower && text.replace(/ /g, "").includes(cinLower)) return true;
+
+        if (hasLegalSuffix) {
+            return variants.some(name => name && text.includes(name));
+        }
+
+        return mentionsCompany(item, companyName);
     };
+}
+
+// companyName    = what the user typed
+// searchName     = the full official name found in the overview (e.g. "Orbit Resorts Limited")
+// matcher        = tells if a page is really about this company
+// cin            = company registration number if one was found (India), else ""
+async function searchOneTopic(companyName, searchName, industry, topic, matcher, cin) {
+    const industryPart = industry && industry !== "Other" ? industry : "";
+
+    // Short, plain label of the topic: "Founder & CEO Details" -> "Founder CEO Details"
+    const shortLabel = topic
+        .replace(/^Company\s+/i, "")
+        .replace(/[&/()]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    // Attempt 1: official name + a few topic words.
+    // Attempt 2 (only if attempt 1 found nothing about this company): official name + topic label.
+    const attempts = [
+        { query: cleanQuery(['"' + searchName + '"', industryPart,
+            (topicSearchTerms[topic] || topic).split(" ").slice(0, 6).join(" ")].join(" ")) },
+        { query: cleanQuery(['"' + searchName + '"', shortLabel].join(" ")) }
+    ];
+
+    // Attempt 3: Indian company-data sites. The MCA portal itself (mca.gov.in) is a
+    // login/captcha form, so search engines cannot read it, but these sites copy its
+    // data (directors, designations, registered office, filings).
+    if (DIRECTORY_TOPICS.has(topic)) {
+        const extra = topic === "Founder & CEO Details"
+            ? "directors managing director CEO DIN"
+            : shortLabel;
+
+        attempts.push({
+            query: cleanQuery([cin, '"' + searchName + '"', extra].filter(Boolean).join(" ")),
+            domains: INDIA_COMPANY_SITES
+        });
+    }
+
+    let results = [];
+    let answer = "";
+
+    for (let i = 0; i < attempts.length; i++) {
+        const searchOptions = {
+            searchDepth: TOPIC_SEARCH_DEPTH,
+            maxResults: RESULTS_PER_TOPIC,
+            includeAnswer: true
+        };
+
+        if (attempts[i].domains) {
+            searchOptions.includeDomains = attempts[i].domains;
+        }
+
+        const response = await tvly.search(attempts[i].query, searchOptions);
+
+        const found = (response.results || []).map(item => ({ ...item, topics: [topic] }));
+        const related = found.filter(item => matcher(item));
+        const usable = isUsableAnswer(response.answer, related.length, found.length);
+
+        console.log("  [" + topic + "] try " + (i + 1) + ": " + found.length + " results, " +
+            related.length + " about the company, usable answer: " + (usable ? "yes" : "no"));
+
+        results = results.concat(found);
+
+        // Use the written answer only if it is a real answer and mostly based on this company's pages.
+        // Otherwise try the next search.
+        if (usable) {
+            answer = String(response.answer).trim();
+            break;
+        }
+    }
+
+    return { topic, results, answer };
+}
+
+// "orbit resort" typed by the user -> "Orbit Resorts Limited" found in the overview text.
+function findOfficialName(userName, texts) {
+    const words = normalizeForMatch(userName).split(" ").filter(Boolean);
+    if (words.length === 0) return userName;
+
+    const escaped = words.map(word => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const suffixes = "(?:Limited|Ltd|Inc|Corporation|Corp|Pvt|Private|LLC|Company|Group|Technologies|Industries)";
+    const pattern = "\\b" + escaped.join("[\\s-]+") + "s?(?:\\s+" + suffixes + ")*\\b";
+    const regex = new RegExp(pattern, "gi");
+
+    const counts = new Map();
+
+    texts.forEach(text => {
+        const found = String(text || "").match(regex) || [];
+        found.forEach(name => {
+            const clean = name.replace(/\s+/g, " ").trim();
+            const key = clean.toLowerCase();
+            const entry = counts.get(key) || { name: clean, count: 0 };
+            entry.count += 1;
+            counts.set(key, entry);
+        });
+    });
+
+    let best = null;
+    counts.forEach(entry => {
+        if (!best || entry.count > best.count ||
+            (entry.count === best.count && entry.name.length > best.name.length)) {
+            best = entry;
+        }
+    });
+
+    return best ? best.name : userName;
 }
 
 // One general search that also gives the Executive Summary.
@@ -425,34 +597,40 @@ app.post("/api/company-research", async (req, res) => {
         console.log("--------------------------------");
 
         try {
-            // 1 overview search (gives the summary) + 1 search per topic
-            const jobs = [
-                () => searchOverview(companyName, industry),
-                ...topicsToSearch.map(topic => () => searchOneTopic(companyName, industry, topic))
+            // Step 1: overview search first (gives the summary AND the official company name).
+            // If this fails (bad key, rate limit, network) the real error is reported.
+            const overview = await searchOverview(companyName, industry);
+
+            const overviewTexts = [
+                overview.answer,
+                ...overview.results
+                    .filter(item => mentionsCompany(item, companyName))
+                    .map(item => (item.title || "") + " " + (item.content || "") + " " + (item.url || ""))
             ];
 
+            const searchName = findOfficialName(companyName, overviewTexts);
+            const cin = findCIN(overviewTexts);
+            const matcher = makeCompanyMatcher(companyName, searchName, cin);
+
+            console.log("Official name used for topic searches:", searchName);
+            console.log("Company registration number (CIN):", cin || "not found");
+
+            // overview pages are checked again with the strict matcher
+            const strictOverview = overview.results.filter(item => matcher(item));
+            overview.results = strictOverview.length > 0 ? strictOverview : overview.results;
+
+            // Step 2: one search per topic, using the official name
+            const jobs = topicsToSearch.map(topic => () => searchOneTopic(companyName, searchName, industry, topic, matcher, cin));
             const settled = await runInBatches(jobs, PARALLEL_SEARCHES);
 
             const failures = settled.filter(item => item.status === "rejected");
-            const successes = settled.filter(item => item.status === "fulfilled");
-
-            // Everything failed -> report the real error (bad key, rate limit, network...)
-            if (successes.length === 0) {
-                throw failures[0].reason;
-            }
 
             if (failures.length > 0) {
-                console.warn(failures.length + " of " + settled.length + " searches failed:",
+                console.warn(failures.length + " of " + settled.length + " topic searches failed:",
                     String(failures[0].reason?.message || failures[0].reason));
             }
 
-            const overviewOutcome = settled[0];
-            const overview = overviewOutcome.status === "fulfilled"
-                ? overviewOutcome.value
-                : { answer: "", results: [] };
-
             const topicResults = settled
-                .slice(1)
                 .filter(item => item.status === "fulfilled")
                 .map(item => item.value);
 
@@ -466,7 +644,10 @@ app.post("/api/company-research", async (req, res) => {
             const mergedResults = mergeResults([overview.results, ...topicResults.map(item => item.results)]);
 
             // keep only pages that really mention this company
-            const relevantResults = mergedResults.filter(item => mentionsCompany(item, companyName));
+            let relevantResults = mergedResults.filter(item => matcher(item));
+            if (relevantResults.length === 0) {
+                relevantResults = mergedResults.filter(item => mentionsCompany(item, companyName));
+            }
             const searchResults = relevantResults.length > 0 ? relevantResults : mergedResults;
 
             console.log("Research Results Found:", searchResults.length,

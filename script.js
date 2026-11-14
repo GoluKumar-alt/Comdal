@@ -95,8 +95,8 @@ const topicSchemas = {
         title: "Founder & CEO Details",
         keywords: ["founder", "co-founder", "CEO", "chief executive officer", "leadership", "executive team"],
         fields: [
-            { label: "Founder / Co-founder", maxFacts: 1, terms: ["founder", "co-founder", "founded by"] },
-            { label: "CEO", maxFacts: 1, terms: ["CEO", "chief executive officer", "managing director", "led by", "appointed"] },
+            { label: "Founder / Co-founder", maxFacts: 1, terms: ["founder", "co-founder", "founded by", "promoter", "promoted by"] },
+            { label: "CEO", maxFacts: 1, terms: ["CEO", "chief executive officer", "managing director", "whole-time director", "chairman", "led by", "appointed"] },
             { label: "Education", maxFacts: 1, terms: ["education", "graduated", "degree", "university", "bachelor", "master"] },
             { label: "Professional Background", maxFacts: 2, terms: ["professional background", "career", "previously worked", "joined", "experience", "leadership"] }
         ]
