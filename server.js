@@ -1,6 +1,6 @@
 // ==========================================
 // COMDAL - COMPANY RESEARCH BACKEND
-// Complete Updated server.js
+// Updated server.js (per-topic Tavily search)
 // ==========================================
 
 const express = require("express");
@@ -225,6 +225,151 @@ function classifyResearchError(error) {
 
 
 // ==========================================
+// 3D. PER-TOPIC TAVILY SEARCH
+// ==========================================
+// Instead of one giant query (which got cut at 380 characters and only
+// covered the first few topics), every selected topic gets its own search.
+
+// These topics are about recent events, so use Tavily's news mode
+const NEWS_TOPICS = new Set([
+    "Latest News & Updates",
+    "Company Press Releases",
+    "Company Events & Conferences"
+]);
+
+// For these topics the company's own website is searched as well
+const OFFICIAL_SITE_TOPICS = new Set([
+    "Company Overview",
+    "Company Mission & Vision",
+    "Contact Information",
+    "Career & Job Opportunities",
+    "Products & Services",
+    "Company Branches & Locations",
+    "Company Policies & Ethics",
+    "Company Sustainability & CSR Initiatives",
+    "Company Press Releases"
+]);
+
+function getDomain(url) {
+    if (!url) return "";
+    try {
+        const value = String(url).trim();
+        return new URL(/^https?:\/\//i.test(value) ? value : "https://" + value)
+            .hostname.replace(/^www\./, "");
+    } catch (error) {
+        return "";
+    }
+}
+
+async function searchOneTopic(companyName, industry, topic, website) {
+    const terms = topicSearchTerms[topic] || topic;
+    const query = `"${companyName}" ${industry} ${terms}`.slice(0, 390);
+
+    const options = {
+        searchDepth: "advanced",
+        chunksPerSource: 3,
+        maxResults: 8,
+        includeAnswer: "advanced"
+    };
+
+    if (NEWS_TOPICS.has(topic)) {
+        options.topic = "news";
+        options.timeRange = "year";
+    }
+
+    const searches = [tvly.search(query, options)];
+
+    // Extra search restricted to the company's official website
+    const domain = getDomain(website);
+    if (domain && OFFICIAL_SITE_TOPICS.has(topic)) {
+        searches.push(
+            tvly.search(query, {
+                searchDepth: "advanced",
+                chunksPerSource: 3,
+                maxResults: 5,
+                includeDomains: [domain]
+            })
+        );
+    }
+
+    const settled = await Promise.allSettled(searches);
+    const fulfilled = settled
+        .filter(s => s.status === "fulfilled")
+        .map(s => s.value);
+
+    if (fulfilled.length === 0) {
+        throw settled[0].reason;
+    }
+
+    return {
+        topic,
+        answer: fulfilled[0].answer || "",
+        results: fulfilled.flatMap(r => r.results || [])
+    };
+}
+
+// Run topics in small batches so Tavily rate limits are not hit
+async function searchAllTopics(companyName, industry, topicList, website) {
+    const BATCH_SIZE = 4;
+    const done = [];
+    let firstError = null;
+
+    for (let i = 0; i < topicList.length; i += BATCH_SIZE) {
+        const batch = topicList.slice(i, i + BATCH_SIZE);
+
+        const settled = await Promise.allSettled(
+            batch.map(topic => searchOneTopic(companyName, industry, topic, website))
+        );
+
+        settled.forEach(s => {
+            if (s.status === "fulfilled") {
+                done.push(s.value);
+            } else {
+                console.error("Topic search failed:", s.reason?.message || s.reason);
+                if (!firstError) firstError = s.reason;
+            }
+        });
+    }
+
+    // Only fail completely if every topic failed
+    if (done.length === 0 && firstError) throw firstError;
+
+    return done;
+}
+
+// Merge results by URL and remember which topics each source came from
+function mergeResults(topicSearches) {
+    const byUrl = new Map();
+    const topicAnswers = {};
+
+    topicSearches.forEach(({ topic, answer, results }) => {
+        if (answer) topicAnswers[topic] = answer;
+
+        results.forEach(item => {
+            const key = String(item.url || "").toLowerCase().replace(/\/+$/, "");
+            if (!key) return;
+
+            const existing = byUrl.get(key);
+
+            if (existing) {
+                if (!existing.topics.includes(topic)) existing.topics.push(topic);
+                if (String(item.content || "").length > String(existing.content || "").length) {
+                    existing.content = item.content;
+                }
+            } else {
+                byUrl.set(key, { ...item, topics: [topic] });
+            }
+        });
+    });
+
+    return {
+        searchResults: [...byUrl.values()],
+        topicAnswers
+    };
+}
+
+
+// ==========================================
 // 4. TEST ROUTE
 // ==========================================
 
@@ -282,43 +427,38 @@ app.post("/api/company-research", async (req, res) => {
             });
         }
 
-        // Build search terms from selected topics
-        let selectedSearchTerms = topics
-            .filter(topic => topic !== "All About Company")
-            .map(topic => topicSearchTerms[topic] || topic);
+        // Topics that will actually be searched (one Tavily search each)
+        const topicList = topics.includes("All About Company")
+            ? Object.keys(topicSearchTerms)
+            : topics.filter(topic => topicSearchTerms[topic]);
 
-        if (topics.includes("All About Company")) {
-            selectedSearchTerms = Object.values(topicSearchTerms);
+        if (topicList.length === 0) {
+            return res.status(400).json({
+                success: false,
+                code: "BAD_REQUEST",
+                message: "None of the selected topics are supported."
+            });
         }
-
-        // Keep query under 380 characters so Tavily API never throws a query-too-long error
-        const rawQuery = [
-            companyName,
-            industry,
-            ...selectedSearchTerms
-        ].join(" ").replace(/\s+/g, " ").trim();
-
-        const searchQuery = rawQuery.slice(0, 380);
 
         console.log("--------------------------------");
         console.log("COMDAL RESEARCH STARTED");
         console.log("Company:", companyName);
-        console.log("Selected Topics:", topics);
-        console.log("Search Query:", searchQuery);
+        console.log("Topics to search:", topicList.length, topicList);
+        console.log("Official website:", getDomain(companyWebsite) || "not provided");
         console.log("--------------------------------");
 
         try {
-            // Search using Tavily with clean AI Answer enabled
-            const searchResults = await tvly.search(searchQuery, {
-                searchDepth: "advanced",
-                includeAnswer: "advanced",
-                maxResults: 10
-            });
-
-            console.log(
-                "Research Results Found:",
-                searchResults.results?.length || 0
+            const topicSearches = await searchAllTopics(
+                companyName,
+                industry,
+                topicList,
+                companyWebsite
             );
+
+            const { searchResults, topicAnswers } = mergeResults(topicSearches);
+
+            console.log("Topics researched:", topicSearches.length, "/", topicList.length);
+            console.log("Unique sources found:", searchResults.length);
 
             const payload = {
                 success: true,
@@ -331,8 +471,9 @@ app.post("/api/company-research", async (req, res) => {
                     industry,
                     topics
                 },
-                aiSummary: searchResults.answer || "",
-                searchResults: searchResults.results || []
+                aiSummary: topicAnswers[topicList[0]] || "",
+                topicAnswers,
+                searchResults
             };
 
             saveCacheEntry(cacheKey, payload);
